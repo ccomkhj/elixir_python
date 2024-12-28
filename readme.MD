@@ -51,7 +51,9 @@ Here, we seamlessly manipulate data frames using Elixir's functional paradigms, 
 
 ## Advanced Data Processing
 
-Handling missing values is a common data science task. Let's perform **linear interpolation**, a bit more involved in Elixir:
+Handling missing values is a common data science task. 
+i.e. `s.interpolate(method='linear')` in python.
+Let's perform **linear interpolation**, a bit more involved in Elixir:
 
 ```elixir
 defmodule DataFrameProcessor do
@@ -99,7 +101,11 @@ The logging used in this module provides insights into the interpolation process
 
 ## Calculating Moving Averages
 
-Moving averages offer insights into data trends. Here’s how to calculate them in Elixir:
+Moving averages offer insights into data trends.
+In python/pandas, again one liner,
+`df['feature'].rolling(9).mean()`.
+Thankfully, there's some support in **Series** in Elixir. Check this [link](https://hexdocs.pm/explorer/Explorer.Series.html#window_mean/3).
+Here’s how to calculate them in Elixir:
 
 ```elixir
 defmodule TemperatureAnalysis do
@@ -145,6 +151,6 @@ VegaLite.new(width: 1080, title: "Temperature Analysis")
 
 While the visualization capabilities are still evolving, Elixir provides a foundation for basic analytical plots.
 
-## Conclusion
+## More
 
-Elixir, with its focus on concurrency and reliability, offers a refreshing perspective on data frame manipulation in data science. While it may not yet match the breadth of libraries available in Python, its potential, especially in applications needing robust backend processing, is significant. Explore these possibilities in your projects and consider contributing to their development.
+You can run the elixir sample code under `samples` using [livebook](https://github.com/livebook-dev/livebook).

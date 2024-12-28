@@ -1,0 +1,230 @@
+# Python2ElixirInDS
+
+```elixir
+Mix.install(
+  [
+    {:kino_explorer, "~> 0.1.20"},
+    {:explorer, "~> 0.10.0"},
+    {:httpoison, "~> 1.8"},
+    {:jason, "~> 1.4"},
+    {:vega_lite, "~> 0.1.7"},
+    {:exla, ">= 0.0.0"},
+    {:kino_vega_lite, "~> 0.1.11"}
+  ],
+  config: [nx: [default_backend: EXLA.Backend]]
+)
+```
+
+## Section
+
+### Basic DataFrame Manipulation
+
+Let's dive into a simple data manipulation task. In Python, you might double the values in a column with `df["feature"] = df["feature"] * 2`. Here's how we achieve the same in Elixir:
+
+```elixir
+alias Explorer.DataFrame
+alias Explorer.Series
+
+# Ensure all macros and functions in Explorer.DataFrame are available
+require DataFrame
+
+# Sample data frame creation
+data = %{
+  feature: [1, 2, 3, 4, 5]
+}
+
+# Creating the DataFrame
+df = DataFrame.new(data)
+
+# Accessing the "feature" column and doubling its values
+# feature_series = DataFrame.pull(df, "feature")
+# doubled_feature = Series.multiply(feature_series, 2)
+
+# Simpler style in elixir, but equivalent to the above
+doubled_feature = DataFrame.pull(df, "feature") 
+  |> Series.multiply(2)
+
+
+# Creating a new DataFrame with the updated values
+df = DataFrame.put(df, "feature", doubled_feature)
+
+df
+```
+
+### Advanced Data Processing
+
+Handling missing values is a common data science task. 
+i.e. `s.interpolate(method='linear')` in python.
+Let's perform **linear interpolation**, a bit more involved in Elixir:
+
+```elixir
+defmodule DataFrameProcessor do
+  require Logger
+  alias Explorer.DataFrame
+  alias Explorer.Series
+
+  # Define a function to interpolate values in a Series
+  def interpolate(series) do
+    values = Series.to_list(series)
+    Logger.info("Original series: #{inspect(values)}")
+
+    interpolated = Enum.reduce_while(values, [], fn value, acc ->
+      Logger.info("Current value: #{inspect(value)}, Accumulated: #{inspect(acc)}")
+
+      case value do
+        nil ->
+          last_value = List.last(acc) || 0.0
+          index = length(acc)
+
+          Logger.info("Interpolating. Last known: #{inspect(last_value)}, Index: #{inspect(index)}")
+
+          rest = Enum.drop(values, index + 1)
+          next_value = Enum.find(rest, fn x -> not is_nil(x) end)
+
+          interpolated_value =
+            if not is_nil(next_value) do
+              (last_value + next_value) / 2
+            else
+              last_value
+            end
+
+          Logger.info("Interpolated value: #{inspect(interpolated_value)}")
+
+          {:cont, acc ++ [interpolated_value]}
+
+        _ ->
+          {:cont, acc ++ [value]}
+      end
+    end)
+
+    Logger.info("Interpolated series: #{inspect(interpolated)}")
+    Series.from_list(interpolated)
+  end
+
+  def process_and_join(date_list, feature1, feature2) do
+    data_df1 = %{
+      "feature1" => feature1,
+      "date" => date_list
+    }
+
+    data_df2 = %{
+      "feature2" => feature2,
+      "date" => date_list
+    }
+
+    df1 = DataFrame.new(data_df1)
+    df2 = DataFrame.new(data_df2)
+
+    Logger.info("Initial DataFrame df1: #{inspect(df1)}")
+    Logger.info("Initial DataFrame df2: #{inspect(df2)}")
+
+    df1 = DataFrame.put(df1, "feature1", interpolate(DataFrame.pull(df1, "feature1")))
+    df2 = DataFrame.put(df2, "feature2", interpolate(DataFrame.pull(df2, "feature2")))
+
+    Logger.info("DataFrame df1 after interpolation: #{inspect(df1)}")
+    Logger.info("DataFrame df2 after interpolation: #{inspect(df2)}")
+
+    joined_df = DataFrame.join(df1, df2, on: "date", how: :left)
+
+    Logger.info("Joined DataFrame: #{inspect(joined_df)}")
+    joined_df
+  end
+end
+
+# Sample data for testing
+date_list = [
+  ~D[2023-01-01],
+  ~D[2023-01-02],
+  ~D[2023-01-03],
+  ~D[2023-01-04],
+  ~D[2023-01-05]
+]
+
+feature1 = [1.0, nil, 3.0, nil, 5.0]
+feature2 = [nil, 8.0, nil, 16.0, 20.0]
+
+# Execute the processor with sample data
+DataFrameProcessor.process_and_join(date_list, feature1, feature2)
+```
+
+Calculating Moving Averages
+Moving averages offer insights into data trends.
+
+In python/pandas, again one liner,
+`df['feature'].rolling(9).mean()`.
+
+Thankfully, there's some support in Series in Elixir. Check this [link](https://hexdocs.pm/explorer/Explorer.Series.html#window_mean/3).
+Here’s how to calculate them in Elixir:
+
+```elixir
+defmodule TemperatureAnalysis do
+  alias Explorer.DataFrame
+  alias Explorer.Series
+
+  def moving_average(date_list, temperature_list, window_size, weights \\ []) do
+    # Create a dataframe with date and temperature
+    data = %{
+      "date" => date_list,
+      "temperature" => temperature_list
+    }
+    df = DataFrame.new(data)
+
+    # Pull the temperature series and calculate the moving average with the provided weights
+    temperature_series = DataFrame.pull(df, "temperature")
+    
+    # Calculate the moving average using the provided weights
+    # If the weights are not provided, equal weighting is assumed
+    moving_avg_series =
+      Series.window_mean(temperature_series, window_size, weights: weights, min_periods: 1)
+    
+    # Add the moving_average column back to the dataframe
+    df_with_moving_avg = DataFrame.put(df, "moving_average", moving_avg_series)
+
+    # Log or return the DataFrame with the moving average
+    IO.inspect(df_with_moving_avg, label: "DataFrame with Moving Average")
+    df_with_moving_avg
+  end
+end
+
+defmodule DateGenerator do
+  # Function to generate a list of dates from a start date to a specified number of days
+  def generate_dates(start_date, days) do
+    Enum.map(0..(days-1), fn offset -> Date.add(start_date, offset) end)
+  end
+end
+
+# Sample Input
+date_list = DateGenerator.generate_dates(~D[2023-01-01], 21)
+
+# Generate dynamic temperature values using a sinusoidal function with noise
+temperature_list = Enum.map(1..21, fn day ->
+  10.0 * :math.sin(day / 2) + Enum.random(-2..2) + 20
+end)
+
+window_size = 3
+
+# Execute the moving average calculation
+temperature = TemperatureAnalysis.moving_average(date_list, temperature_list, window_size, nil)
+```
+
+Visualization is apparently week compared to python. 
+But it provides the basics.
+
+`df.plot()`
+
+<!-- livebook:{"attrs":"eyJjaGFydF90aXRsZSI6ImNhc2Ugc3R1ZHkiLCJoZWlnaHQiOm51bGwsImxheWVycyI6W3siYWN0aXZlIjp0cnVlLCJjaGFydF90eXBlIjoibGluZSIsImNvbG9yX2ZpZWxkIjpudWxsLCJjb2xvcl9maWVsZF9hZ2dyZWdhdGUiOm51bGwsImNvbG9yX2ZpZWxkX2JpbiI6bnVsbCwiY29sb3JfZmllbGRfc2NhbGVfc2NoZW1lIjpudWxsLCJjb2xvcl9maWVsZF90eXBlIjpudWxsLCJkYXRhX3ZhcmlhYmxlIjoidGVtcGVyYXR1cmUiLCJnZW9kYXRhX2NvbG9yIjoiYmx1ZSIsImxhdGl0dWRlX2ZpZWxkIjpudWxsLCJsb25naXR1ZGVfZmllbGQiOm51bGwsInhfZmllbGQiOiJkYXRlIiwieF9maWVsZF9hZ2dyZWdhdGUiOm51bGwsInhfZmllbGRfYmluIjpudWxsLCJ4X2ZpZWxkX3NjYWxlX3R5cGUiOm51bGwsInhfZmllbGRfdHlwZSI6InRlbXBvcmFsIiwieV9maWVsZCI6Im1vdmluZ19hdmVyYWdlIiwieV9maWVsZF9hZ2dyZWdhdGUiOm51bGwsInlfZmllbGRfYmluIjpudWxsLCJ5X2ZpZWxkX3NjYWxlX3R5cGUiOm51bGwsInlfZmllbGRfdHlwZSI6InF1YW50aXRhdGl2ZSJ9LHsiYWN0aXZlIjp0cnVlLCJjaGFydF90eXBlIjoicG9pbnQiLCJjb2xvcl9maWVsZCI6bnVsbCwiY29sb3JfZmllbGRfYWdncmVnYXRlIjpudWxsLCJjb2xvcl9maWVsZF9iaW4iOm51bGwsImNvbG9yX2ZpZWxkX3NjYWxlX3NjaGVtZSI6bnVsbCwiY29sb3JfZmllbGRfdHlwZSI6bnVsbCwiZGF0YV92YXJpYWJsZSI6InRlbXBlcmF0dXJlIiwiZ2VvZGF0YV9jb2xvciI6ImJsdWUiLCJsYXRpdHVkZV9maWVsZCI6bnVsbCwibG9uZ2l0dWRlX2ZpZWxkIjpudWxsLCJ4X2ZpZWxkIjoiZGF0ZSIsInhfZmllbGRfYWdncmVnYXRlIjpudWxsLCJ4X2ZpZWxkX2JpbiI6bnVsbCwieF9maWVsZF9zY2FsZV90eXBlIjpudWxsLCJ4X2ZpZWxkX3R5cGUiOiJ0ZW1wb3JhbCIsInlfZmllbGQiOiJ0ZW1wZXJhdHVyZSIsInlfZmllbGRfYWdncmVnYXRlIjpudWxsLCJ5X2ZpZWxkX2JpbiI6bnVsbCwieV9maWVsZF9zY2FsZV90eXBlIjpudWxsLCJ5X2ZpZWxkX3R5cGUiOiJxdWFudGl0YXRpdmUifV0sInZsX2FsaWFzIjoiRWxpeGlyLlZlZ2FMaXRlIiwid2lkdGgiOjEwODB9","chunks":null,"kind":"Elixir.KinoVegaLite.ChartCell","livebook_object":"smart_cell"} -->
+
+```elixir
+VegaLite.new(width: 1080, title: "case study")
+|> VegaLite.data_from_values(temperature, only: ["date", "moving_average", "temperature"])
+|> VegaLite.layers([
+  VegaLite.new()
+  |> VegaLite.mark(:line)
+  |> VegaLite.encode_field(:x, "date", type: :temporal)
+  |> VegaLite.encode_field(:y, "moving_average", type: :quantitative),
+  VegaLite.new()
+  |> VegaLite.mark(:point)
+  |> VegaLite.encode_field(:x, "date", type: :temporal)
+  |> VegaLite.encode_field(:y, "temperature", type: :quantitative)
+])
+```
