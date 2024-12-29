@@ -1,0 +1,128 @@
+# ProcessProduction
+
+```elixir
+Mix.install(
+  [
+  {:ecto_sql, "~> 3.10"},
+  {:postgrex, "~> 0.17.3"},
+  {:kino, "~> 0.11.0"},
+  {:kino_db, "~> 0.2.4"}
+  ],
+  config: [nx: [default_backend: EXLA.Backend]]
+)
+```
+
+## Section
+
+Goal is this page is to access and process production dataset through livebook
+
+<!-- livebook:{"break_markdown":true} -->
+
+#### For Demo, let's define a new Repo.
+
+```elixir
+defmodule MyApp.Repo do
+  use Ecto.Repo,
+    otp_app: :my_app,
+    adapter: Ecto.Adapters.Postgres
+end
+
+defmodule MyApp.Application do
+ use Application
+
+ def start(_type, _args) do
+   children = [
+     MyApp.Repo,
+     # other children...
+   ]
+
+   opts = [strategy: :one_for_one, name: MyApp.Supervisor]
+   Supervisor.start_link(children, opts)
+ end
+end
+
+defmodule Repo do
+  use Ecto.Repo, otp_app: :my_app, adapter: Ecto.Adapters.Postgres
+end
+
+defmodule Weather do
+  use Ecto.Schema
+
+  schema "weather" do
+    field(:city, :string)
+    field(:temp_lo, :integer)
+    field(:temp_hi, :integer)
+    field(:prcp, :float, default: 0.0)
+
+    timestamps()
+  end
+end
+
+
+```
+
+Connect to the database. In this demo, postgres is locally hosted.
+
+```elixir
+configs = %{
+  hostname: "postgres-local",
+  username: "postgres",
+  password: "postgres",
+  database: "postgres"
+}
+
+url = "postgres://#{configs.username}:#{configs.password}@#{configs.hostname}/#{configs.database}"
+
+Kino.start_child({Repo, url: url})
+```
+
+If there's no table, then create a table.
+
+```elixir
+Ecto.Adapters.SQL.query!(Repo, "CREATE TABLE IF NOT EXISTS users (id INT)")
+```
+
+We can send queries to db as below.
+
+```elixir
+Ecto.Adapters.SQL.query!(Repo, "insert into users values (7)")
+
+Ecto.Adapters.SQL.query!(Repo, "select * from users")
+```
+
+Using Ecto to manage table
+
+```elixir
+defmodule Migrations.AddWeatherTable do
+  use Ecto.Migration
+
+  def up do
+    create table("weather") do
+      add(:city, :string, size: 40)
+      add(:temp_lo, :integer)
+      add(:temp_hi, :integer)
+      add(:prcp, :float)
+
+      timestamps()
+    end
+  end
+
+  def down do
+    drop(table("weather"))
+  end
+end
+
+Ecto.Migrator.up(Repo, 1, Migrations.AddWeatherTable)
+```
+
+```elixir
+weather = %Weather{temp_lo: 0, temp_hi: 23}
+Repo.insert!(weather)
+```
+
+Data is loaded as dataframe. We are ready to process data.
+
+```elixir
+Repo.all(Weather)
+|> Kino.DataTable.new()
+```

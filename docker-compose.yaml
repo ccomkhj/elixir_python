@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  livebook_with_volume:
+    image: ghcr.io/livebook-dev/livebook
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    pull_policy: always
+    user: "${UID}:${GID}"
+    volumes:
+      - "./samples:/data"
+    environment:
+      LIVEBOOK_PASSWORD: "hexafarmspw123"
+  
+  postgres:
+    image: postgres:latest
+    container_name: postgres-local
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
