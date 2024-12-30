@@ -1,0 +1,34 @@
+# AccessRemote_Attached_node
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.0"}
+])
+```
+
+## Section
+
+To run the livebook together with a phoenix service,
+`iex --name test@0.0.0.0 --cookie hexacookie -S mix phx.server` was running under `demo_app` project.
+
+Under **Runtime settings**, `test@0.0.0.0` and `hexacookie` are configured.
+
+<!-- livebook:{"break_markdown":true} -->
+
+As you can see above, you are not be able to install additional dependencies. You are running this service under the existing service.
+
+```elixir
+DemoApp.Repo.config()
+```
+
+```elixir
+DemoAppWeb.PageHTML.home(0)
+```
+
+Yeah! you can run all command inside the app. Which means, you can run the prepared Ecto queries.
+
+<!-- livebook:{"break_markdown":true} -->
+
+Disadvantage is `smart` features are not allowed in this mode.
+
+<!-- livebook:{"offset":794,"stamp":{"token":"XCP.EfvM5wVItRJtlIErjmvG7WQNExufRoFSvF2yW6p2UK9VILxlJbZ9B0NYGSIOkk6YHzHRdSHAZzl3rrXFkrIZqgKy0CdILiBQd1wr1FCPVGQQ","version":2}} -->

@@ -1,4 +1,4 @@
-# ProcessProduction
+# Connect_DB
 
 ```elixir
 Mix.install(
@@ -21,26 +21,6 @@ Goal is this page is to access and process production dataset through livebook
 #### For Demo, let's define a new Repo.
 
 ```elixir
-defmodule MyApp.Repo do
-  use Ecto.Repo,
-    otp_app: :my_app,
-    adapter: Ecto.Adapters.Postgres
-end
-
-defmodule MyApp.Application do
- use Application
-
- def start(_type, _args) do
-   children = [
-     MyApp.Repo,
-     # other children...
-   ]
-
-   opts = [strategy: :one_for_one, name: MyApp.Supervisor]
-   Supervisor.start_link(children, opts)
- end
-end
-
 defmodule Repo do
   use Ecto.Repo, otp_app: :my_app, adapter: Ecto.Adapters.Postgres
 end

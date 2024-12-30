@@ -12,6 +12,8 @@ services:
       - "./samples:/data"
     environment:
       LIVEBOOK_PASSWORD: "hexafarmspw123"
+      ERL_COOKIE: "hexacookie"
+    network_mode: host
   
   postgres:
     image: postgres:latest
@@ -24,6 +26,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    network_mode: host
 
 volumes:
   pgdata:

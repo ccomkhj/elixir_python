@@ -1,0 +1,78 @@
+# AccessRemote_standalone
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.0"},
+  {:kino_vega_lite, "~> 0.1.11"}
+])
+```
+
+## Section
+
+<!-- livebook:{"attrs":"eyJhc3NpZ25fdG8iOiIiLCJjb2RlIjoiY29uZmlnID0gRGVtb0FwcC5SZXBvLmNvbmZpZygpXG5yZXN1bHQgPSAle1xuICBjb25maWc6IGNvbmZpZ1s6ZGF0YWJhc2VdLFxuICBmYWtlX3RpbWU6IFsxLDIsMyw0LDUsNiw3LDgsOSwxMCwxMSwxMiwxMywxNF0sXG4gIGZha2VfdmFsdWU6IFsxLDIsMyw0LDQsNCw0LDUsNSw1LDYsNiw2LDddXG59IiwiY29va2llIjoiIiwiY29va2llX3NlY3JldCI6IkNPT0tJRSIsIm5vZGUiOiJ0ZXN0QDAuMC4wLjAiLCJub2RlX3NlY3JldCI6IiIsInVzZV9jb29raWVfc2VjcmV0Ijp0cnVlLCJ1c2Vfbm9kZV9zZWNyZXQiOmZhbHNlfQ","chunks":null,"kind":"Elixir.Kino.RemoteExecutionCell","livebook_object":"smart_cell"} -->
+
+```elixir
+require Kino.RPC
+node = :"test@0.0.0.0"
+Node.set_cookie(node, String.to_atom(System.fetch_env!("LB_COOKIE")))
+
+Kino.RPC.eval_string(
+  node,
+  ~S"""
+  config = DemoApp.Repo.config()
+  result = %{
+    config: config[:database],
+    fake_time: [1,2,3,4,5,6,7,8,9,10,11,12,13,14],
+    fake_value: [1,2,3,4,4,4,4,5,5,5,6,6,6,7]
+  }
+  """,
+  file: __ENV__.file
+)
+```
+
+Variable is not accessble from other cells.
+
+```elixir
+result
+```
+
+Below is a walkaround to access the variable from another cell.
+
+```elixir
+require Kino.RPC
+# Assuming you have already set up the node and authentication
+node = :"test@0.0.0.0"
+Node.set_cookie(node, String.to_atom(System.fetch_env!("LB_COOKIE")))
+
+# Evaluate the string on the remote node
+result = Kino.RPC.eval_string(
+  node,
+  ~S"""
+  config = DemoApp.Repo.config()
+  dataset = %{
+    config: config[:database],
+    fake_time: [1,2,3,4,5,6,7,8,9,10,11,12,13,14],
+    fake_value: [1,2,3,4,4,4,4,5,5,5,6,6,6,7]
+  }
+  dataset
+  """,
+  file: __ENV__.file
+)
+
+```
+
+```elixir
+selected_dataset = Map.take(result, [:fake_value, :fake_time])
+```
+
+<!-- livebook:{"attrs":"eyJjaGFydF90aXRsZSI6bnVsbCwiaGVpZ2h0IjpudWxsLCJsYXllcnMiOlt7ImFjdGl2ZSI6dHJ1ZSwiY2hhcnRfdHlwZSI6InBvaW50IiwiY29sb3JfZmllbGQiOm51bGwsImNvbG9yX2ZpZWxkX2FnZ3JlZ2F0ZSI6bnVsbCwiY29sb3JfZmllbGRfYmluIjpudWxsLCJjb2xvcl9maWVsZF9zY2FsZV9zY2hlbWUiOm51bGwsImNvbG9yX2ZpZWxkX3R5cGUiOm51bGwsImRhdGFfdmFyaWFibGUiOiJzZWxlY3RlZF9kYXRhc2V0IiwiZ2VvZGF0YV9jb2xvciI6ImJsdWUiLCJsYXRpdHVkZV9maWVsZCI6bnVsbCwibG9uZ2l0dWRlX2ZpZWxkIjpudWxsLCJ4X2ZpZWxkIjoiZmFrZV90aW1lIiwieF9maWVsZF9hZ2dyZWdhdGUiOm51bGwsInhfZmllbGRfYmluIjpudWxsLCJ4X2ZpZWxkX3NjYWxlX3R5cGUiOm51bGwsInhfZmllbGRfdHlwZSI6InF1YW50aXRhdGl2ZSIsInlfZmllbGQiOiJmYWtlX3ZhbHVlIiwieV9maWVsZF9hZ2dyZWdhdGUiOm51bGwsInlfZmllbGRfYmluIjpudWxsLCJ5X2ZpZWxkX3NjYWxlX3R5cGUiOm51bGwsInlfZmllbGRfdHlwZSI6InF1YW50aXRhdGl2ZSJ9XSwidmxfYWxpYXMiOiJFbGl4aXIuVmVnYUxpdGUiLCJ3aWR0aCI6OTIwfQ","chunks":null,"kind":"Elixir.KinoVegaLite.ChartCell","livebook_object":"smart_cell"} -->
+
+```elixir
+VegaLite.new(width: 920)
+|> VegaLite.data_from_values(selected_dataset, only: ["fake_time", "fake_value"])
+|> VegaLite.mark(:point)
+|> VegaLite.encode_field(:x, "fake_time", type: :quantitative)
+|> VegaLite.encode_field(:y, "fake_value", type: :quantitative)
+```
+
+<!-- livebook:{"offset":2946,"stamp":{"token":"XCP.r46v9a66a1nmizY9K0ceRAG4cZPey-BPl8bJVmFd566dUJWD7QiS0O5NZAOQqg7mhfbXvPmTcfWfcfgdUz9gT46jNjB08ZDsdWwhzecbVuihM1P_GVNPpa09QMn1jAGU1w","version":2}} -->
