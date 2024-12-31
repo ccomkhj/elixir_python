@@ -1,0 +1,253 @@
+<!-- livebook:{"app_settings":{"output_type":"rich","slug":"so-survey-elixir"},"file_entries":[{"name":"survey_results_public.csv","type":"attachment"},{"name":"survey_results_schema.csv","type":"attachment"}]} -->
+
+# 6_Data_Visualization_With_Smart_Chart
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.0"},
+  {:kino_explorer, "~> 0.1.20"},
+  {:kino_vega_lite, "~> 0.1.11"},
+  {:tucan, "~> 0.4.1"}
+])
+```
+
+## Data
+
+The associated files are from https://survey.stackoverflow.co/
+
+Code base from https://github.com/hugobarauna/livebook-notebooks/blob/main/ci_green_streak.livemd
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Basic exploration
+
+```elixir
+schema =
+  Kino.FS.file_path("survey_results_schema.csv")
+  |> Explorer.DataFrame.from_csv!()
+
+Kino.nothing()
+```
+
+```elixir
+data =
+  Kino.FS.file_path("survey_results_public.csv")
+  |> Explorer.DataFrame.from_csv!()
+
+Kino.nothing()
+```
+
+## Professional developers by age
+
+There's a hypthoseis that developers in the Elixir community leans toward older people. I was curious about that and also how it would compare to other communities.
+
+```elixir
+require Explorer.DataFrame
+```
+
+```elixir
+Tucan.scatter(:iris, "petal_width", "petal_length")
+|> Tucan.Axes.set_offset(:y, 10)
+|> Tucan.Grid.set_enabled(false)
+|> VegaLite.to_spec()
+```
+
+```elixir
+language = "Elixir"
+
+developers =
+  data
+  |> Explorer.DataFrame.select(["YearsCodePro", "LanguageHaveWorkedWith", "Age"])
+  |> Explorer.DataFrame.filter(col("YearsCodePro") != "NA")
+  |> Explorer.DataFrame.mutate([
+    {^language, contains(col("LanguageHaveWorkedWith"), ^language)}
+  ])
+
+VegaLite.new(title: "Profesional #{language} developers by age", width: 400, height: 200)
+|> VegaLite.data_from_values(developers)
+|> VegaLite.transform(filter: "datum.#{language} == true")
+|> VegaLite.transform(aggregate: [[op: "count", field: "Age", as: "count"]], groupby: ["Age"])
+|> VegaLite.transform(
+  window: [[op: "sum", field: "count", as: "total_count"]],
+  frame: [nil, nil]
+)
+|> VegaLite.transform(calculate: "(datum.count / datum.total_count)", as: "percentage")
+|> Tucan.layers([
+  Tucan.new()
+  |> Tucan.bar("Age", "percentage",
+    tooltip: true,
+    x: [
+      axis: [label_font_size: 14, label_angle: -60],
+      sort: [
+        "Under 18 years old",
+        "18-24 years old",
+        "25-34 years old",
+        "35-44 years old",
+        "45-54 years old",
+        "55-64 years old",
+        "65 years or older",
+        "Prefer not to say"
+      ]
+    ],
+    y: [
+      axis: [format: ".0%", title: nil],
+      scale: [domain: [0, 0.45]]
+    ]
+  ),
+  VegaLite.new()
+  |> VegaLite.transform(calculate: "'(n = ' + format(datum.total_count, ',') + ')'", as: "formatted_count")
+  |> VegaLite.mark(:text,
+    color: "grey",
+    font_size: 14,
+    font_weight: "200",
+    dx: -50
+  )
+  |> VegaLite.encode_field(:text, "formatted_count")
+  |> VegaLite.encode(:x, value: "width")
+  |> VegaLite.encode(:y, value: 20)
+])
+```
+
+```elixir
+vl_specs =
+  Enum.map(["Elixir", "Ruby", "Python", "JavaScript", "Go"], fn language ->
+    developers =
+      data
+      |> Explorer.DataFrame.select(["YearsCodePro", "LanguageHaveWorkedWith", "Age"])
+      |> Explorer.DataFrame.filter(col("YearsCodePro") != "NA")
+      |> Explorer.DataFrame.mutate([
+        {^language, contains(col("LanguageHaveWorkedWith"), ^language)}
+      ])
+
+    VegaLite.new(title: "Profesional #{language} developers by age", width: 400, height: 200)
+    |> VegaLite.data_from_values(developers)
+    |> VegaLite.transform(filter: "datum.#{language} == true")
+    |> VegaLite.transform(aggregate: [[op: "count", field: "Age", as: "count"]], groupby: ["Age"])
+    |> VegaLite.transform(
+      window: [[op: "sum", field: "count", as: "total_count"]],
+      frame: [nil, nil]
+    )
+    |> VegaLite.transform(calculate: "(datum.count / datum.total_count)", as: "percentage")
+    |> Tucan.layers([
+      Tucan.new()
+      |> Tucan.bar("Age", "percentage",
+        tooltip: true,
+        x: [
+          axis: [label_font_size: 14, label_angle: -60],
+          sort: [
+            "Under 18 years old",
+            "18-24 years old",
+            "25-34 years old",
+            "35-44 years old",
+            "45-54 years old",
+            "55-64 years old",
+            "65 years or older",
+            "Prefer not to say"
+          ]
+        ],
+        y: [
+          axis: [format: ".0%", title: nil],
+          scale: [domain: [0, 0.45]]
+        ]
+      ),
+      VegaLite.new()
+      |> VegaLite.transform(
+        calculate: "'(n = ' + format(datum.total_count, ',') + ')'",
+        as: "formatted_count"
+      )
+      |> VegaLite.mark(:text,
+        color: "grey",
+        font_size: 14,
+        font_weight: "200",
+        dx: -50
+      )
+      |> VegaLite.encode_field(:text, "formatted_count")
+      |> VegaLite.encode(:x, value: "width")
+      |> VegaLite.encode(:y, value: 20)
+    ])
+  end)
+
+Kino.nothing()
+```
+
+```elixir
+import Kino.Shorts
+```
+
+```elixir
+grid(
+  [
+    markdown("## Professional developers by age"),
+    Kino.Layout.grid(vl_specs, columns: 2)
+  ],
+  boxed: true
+)
+```
+
+## Professional developers by years coding (NOT including education)
+
+```elixir
+vl_specs =
+  Enum.map(["Elixir", "Ruby", "Python", "JavaScript", "Go"], fn language ->
+    developers =
+      data
+      |> Explorer.DataFrame.select(["YearsCodePro", "LanguageHaveWorkedWith", "Age"])
+      |> Explorer.DataFrame.filter(col("YearsCodePro") != "NA")
+      |> Explorer.DataFrame.mutate([
+        {^language, contains(col("LanguageHaveWorkedWith"), ^language)}
+      ])
+
+    VegaLite.new(
+      title: "Profesional #{language} developers by years coding",
+      width: 400,
+      height: 200
+    )
+    |> VegaLite.data_from_values(developers)
+    |> VegaLite.transform(filter: "datum.#{language} == true")
+    |> Tucan.layers([
+      Tucan.new()
+      |> Tucan.histogram("YearsCodePro",
+        step: 5,
+        relative: true,
+        tooltip: :data,
+        width: 400,
+        height: 200,
+        x: [
+          axis: [title_font_size: 14]
+        ],
+        y: [scale: [domain: [0, 0.35]]]
+      )
+      |> Tucan.Axes.set_x_title("Year coding professionallly, NOT including education")
+      |> Tucan.Axes.set_y_title(""),
+      VegaLite.new()
+      |> VegaLite.transform(aggregate: [[op: "count", as: "total_count"]])
+      |> VegaLite.transform(
+        calculate: "'(n = ' + format(datum.total_count, ',') + ')'",
+        as: "formatted_count"
+      )
+      |> VegaLite.mark(:text,
+        color: "grey",
+        font_size: 14,
+        font_weight: "200",
+        dx: -50
+      )
+      |> VegaLite.encode_field(:text, "formatted_count")
+      |> VegaLite.encode(:x, value: "width")
+      |> VegaLite.encode(:y, value: 20)
+    ])
+  end)
+
+Kino.nothing()
+```
+
+```elixir
+grid(
+  [
+    markdown("## Professional developers by years coding (NOT including education)"),
+    Kino.Layout.grid(vl_specs, columns: 2)
+  ],
+  boxed: true
+)
+```
+
+<!-- livebook:{"offset":6884,"stamp":{"token":"XCP.SyOyAU4BXrTX8z2IT8ib4eidEjFQbDg9K841R28LjWa9-EtEg_bbwl0MuHFEVaPS7HYp1VAzOI2fM9NBNzi3VpdhoKByslGbVW4_22PzCvXroeR4hgVKGzuA","version":2}} -->
