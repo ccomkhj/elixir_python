@@ -1,0 +1,22 @@
+# 5_How_to_expose_an_API_endpoint
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:plug, "~> 1.16"}
+])
+```
+
+## Section
+
+```elixir
+Kino.Proxy.listen(fn conn ->
+  Plug.Conn.send_resp(conn, 200, "hexafarms return from Elixir")
+end)
+```
+
+For testing, use path below.
+
+```
+/proxy/sessions/:id/*path
+```
