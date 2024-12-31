@@ -1,6 +1,6 @@
 <!-- livebook:{"app_settings":{"output_type":"rich","slug":"so-survey-elixir"},"file_entries":[{"name":"survey_results_public.csv","type":"attachment"},{"name":"survey_results_schema.csv","type":"attachment"}]} -->
 
-# 6_Data_Visualization_With_Smart_Chart
+# 6_Data_Visualization_Without_Smart_Chart
 
 ```elixir
 Mix.install([
