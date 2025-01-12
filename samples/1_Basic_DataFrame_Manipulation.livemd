@@ -1,3 +1,5 @@
+<!-- livebook:{"file_entries":[{"name":"Plant_1_Weather_Sensor_Data.csv","type":"attachment"},{"name":"household_power_consumption.csv","type":"attachment"}]} -->
+
 # Basic DataFrame Manipulation
 
 ```elixir
@@ -9,7 +11,7 @@ Mix.install(
     {:jason, "~> 1.4"},
     {:vega_lite, "~> 0.1.7"},
     {:exla, ">= 0.0.0"},
-    {:kino_vega_lite, "~> 0.1.11"}
+    {:kino_vega_lite, "~> 0.1.11"},
   ],
   config: [nx: [default_backend: EXLA.Backend]]
 )
@@ -227,4 +229,180 @@ VegaLite.new(width: 1080, title: "case study")
   |> VegaLite.encode_field(:x, "date", type: :temporal)
   |> VegaLite.encode_field(:y, "temperature", type: :quantitative)
 ])
+```
+
+Let's dive deeper!
+Downlaod sample uisng below and attach to livebook.
+
+```
+curl -L -o ~/Downloads/240000-household-electricity-consumption-records.zip\
+  https://www.kaggle.com/api/v1/datasets/download/thedevastator/240000-household-electricity-consumption-records
+```
+
+Or If you like to have Sensor data, Use below
+
+```
+#!/bin/bash
+curl -L -o ~/Downloads/solar-power-generation-data.zip\
+  https://www.kaggle.com/api/v1/datasets/download/anikannal/solar-power-generation-data
+```
+
+```elixir
+csv_path = "/data/files/household_power_consumption.csv"
+# Specify the `dtypes` options for numerical columns
+# Specify the options for loading the CSV
+options = [
+  dtypes: %{
+    "Global_active_power" => :float,
+    "Global_reactive_power" => :float,
+    "Voltage" => :float,
+    "Global_intensity" => :float,
+    "Sub_metering_1" => :float,
+    "Sub_metering_2" => :float,
+    "Sub_metering_3" => :float
+  },
+  nil_values: ["?"]  # Use the correct option `nil_values` instead of `null_values`
+]
+
+# Load the CSV into a DataFrame with specified options
+df = DataFrame.from_csv!(csv_path, options)
+```
+
+Let use dataset below, because I want to expore datetime.
+
+```elixir
+csv_path = "/data/files/Plant_1_Weather_Sensor_Data.csv"
+
+# Load the CSV into a DataFrame with specified options
+df = DataFrame.from_csv!(csv_path)
+```
+
+## Datetime handling
+
+```elixir
+alias Explorer.DataFrame, as: DF
+```
+
+```elixir
+DF.dtypes(df)
+```
+
+`DATE_TIME` column is recognized as `:string`, so let's handle this better!
+
+```elixir
+DF.pull(df, "DATE_TIME") |> Series.first() |> DateTime.from_iso8601(:basic)
+```
+
+It seems the format is not Elixir friendly. So need to handle this smart.
+
+```elixir
+defmodule DateTimeParser do
+  @moduledoc """
+  A module for parsing datetime strings into Elixir DateTime structs.
+  """
+
+  @doc """
+  Parses a datetime string in the format "YYYY-MM-DD HH:MM:SS" into a DateTime struct.
+
+  ## Examples
+
+      iex> DateTimeParser.parse_to_datetime("2020-05-15 00:00:00")
+      {:ok, ~U[2020-05-15 00:00:00Z]}
+
+      iex> DateTimeParser.parse_to_datetime("invalid-string")
+      {:error, :invalid_format}
+
+  """
+  def parse_to_datetime(datetime_string) when is_binary(datetime_string) do
+    datetime_string
+    |> String.replace(" ", "T")
+    |> Kernel.<>("Z")
+    |> DateTime.from_iso8601()
+    |> handle_parsing_result()
+  end
+
+  @doc """
+  Parses a datetime string in the format "YYYY-MM-DD HH:MM:SS" into a DateTime struct.
+  Raises an error if parsing fails.
+  """
+  def parse_to_datetime!(datetime_string) when is_binary(datetime_string) do
+    case parse_to_datetime(datetime_string) do
+      {:ok, datetime} -> datetime
+      {:error, _reason} -> raise "Invalid datetime format!"
+    end
+  end
+
+  defp handle_parsing_result({:ok, datetime, _offset}) do
+    {:ok, datetime}
+  end
+  defp handle_parsing_result({:error, reason}) do
+    {:error, reason}
+  end
+  
+end
+
+# Usage example
+datetime_string = "1993-05-17 00:00:00"
+case DateTimeParser.parse_to_datetime(datetime_string) do
+  {:ok, datetime} -> datetime
+  {:error, reason} -> IO.puts("Failed to parse: #{reason}")
+end
+```
+
+```elixir
+DF.pull(df, "DATE_TIME") |> Series.first() |>DateTimeParser.parse_to_datetime!
+```
+
+```elixir
+# Assuming `df` is your dataframe and `DF.pull/2` provides an `Explorer.Series`
+date_time_series = DF.pull(df, "DATE_TIME")
+
+# Convert the series to a list, map the transformation, and convert back to series
+datetime_list = date_time_series
+|> Explorer.Series.to_list()  # Convert to list
+|> Enum.map(&DateTimeParser.parse_to_datetime!/1)  # Apply transformation
+
+# Optionally, convert the list back to an Explorer.Series
+new_date_time_series = Explorer.Series.from_list(datetime_list)
+```
+
+Above works, but below is more beautiful. Data friendly way :)
+
+```elixir
+DF.pull(df, "DATE_TIME") |> Series.transform(&DateTimeParser.parse_to_datetime!/1)
+```
+
+```elixir
+DataFrame.transform(df, [names: ["DATE_TIME"]], 
+  &DateTimeParser.parse_to_datetime!(&1)
+)
+
+
+```
+
+Above does not work because the format is not exactly matching. So let's convert syntax.
+
+```elixir
+df2 = DataFrame.transform(df, [names: ["DATE_TIME"]], 
+  fn row ->
+    value = row["DATE_TIME"] |> DateTimeParser.parse_to_datetime!
+    %{"DATE_TIME" => value}
+  end
+)
+```
+
+```elixir
+DF.dtypes(df2)
+```
+
+Awesome! it uses datetime format :) However, it does not overwrite.
+
+```elixir
+Explorer.DataFrame.mutate(df, new_column: transform(col("DATE_TIME"), &DateTimeParser.parse_to_datetime!/1))
+```
+
+As you notice from the error message above, let's use `put`
+
+```elixir
+DataFrame.put(df, "DATE_TIME", Series.transform(df["DATE_TIME"], &DateTimeParser.parse_to_datetime!/1))
 ```
