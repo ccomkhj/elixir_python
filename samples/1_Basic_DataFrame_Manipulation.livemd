@@ -404,5 +404,41 @@ Explorer.DataFrame.mutate(df, new_column: transform(col("DATE_TIME"), &DateTimeP
 As you notice from the error message above, let's use `put`
 
 ```elixir
-DataFrame.put(df, "DATE_TIME", Series.transform(df["DATE_TIME"], &DateTimeParser.parse_to_datetime!/1))
+df2 = DataFrame.put(df, "DATE_TIME", Series.transform(df["DATE_TIME"], &DateTimeParser.parse_to_datetime!/1))
+```
+
+Simply convert into `:date`
+
+```elixir
+Series.cast(df2["DATE_TIME"], :date)
+```
+
+```elixir
+df2 = DF.mutate_with(df2, &[DATE: Series.cast(&1["DATE_TIME"], :date)])
+# or below works, too
+# df2 = DataFrame.put(df2, "DATE", Series.cast(df2["DATE_TIME"], :date))
+```
+
+week can be introduced simply!
+
+```elixir
+DF.mutate(df2, &[week: day_of_week(&1["DATE"])])
+```
+
+## Aggregation
+
+```elixir
+df2
+|> DF.group_by("DATE")
+|> DF.summarise_with(&%{
+    "AMBIENT_TEMPERATURE_MEAN" => Explorer.Series.mean(&1["AMBIENT_TEMPERATURE"])
+})
+```
+
+```elixir
+df2
+|> DF.group_by("DATE")
+|> DF.summarise_with(&[
+    AMBIENT_TEMPERATURE_MEAN: Explorer.Series.mean(&1["AMBIENT_TEMPERATURE"])
+])
 ```
